@@ -1,0 +1,58 @@
+outputs:
+  Fac: NodeSocketFloat
+
+nodes:
+  # Apply grainy normals to faces that aren't vertical or horizontal.
+  # Use non transformed normals to not consider object rotation.
+  ldr_normals:
+    type: ShaderNodeAttribute
+    attribute_name: ldr_normals
+    location: -1600, 400
+
+  separate:
+    type: ShaderNodeSeparateXYZ
+    location: -1400, 400
+    inputs:
+      - node: ldr_normals
+        socket: Vector
+
+  absolute:
+    type: ShaderNodeMath
+    location: -1200, 400
+    operation: ABSOLUTE
+    inputs:
+      - node: separate
+        socket: Y
+
+  # Use normal.y to check if the face is horizontal (-1.0 or 1.0) or vertical (0.0).
+  # Any values in between are considered "slopes" and use grainy normals.
+  compare:
+    type: ShaderNodeMath
+    location: -1000, 400
+    operation: COMPARE
+    inputs:
+      - absolute
+      - 0.5
+      - 0.45
+
+  is_stud:
+    type: ShaderNodeAttribute
+    location: -1000, 200
+    attribute_name: ldr_is_stud
+
+  # Don't apply the grainy slopes to any faces marked as studs.
+  # We use an attribute here to avoid per face material assignment.
+  subtract_studs: 
+    type: ShaderNodeMath
+    location: -800, 400
+    operation: SUBTRACT
+    inputs:
+      - compare
+      - node: is_stud
+        socket: Fac
+
+  output:
+    type: NodeGroupOutput
+    location: -600, 200
+    inputs:
+      - subtract_studs

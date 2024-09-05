@@ -1,0 +1,44 @@
+outputs:
+  Normal: NodeSocketVector
+
+nodes:
+  output_node:
+    type: NodeGroupOutput
+    location: 0, 0
+    inputs:
+      - bump
+
+  bevel:
+    type: ShaderNodeBevel
+    location: -480, -300
+    inputs:
+      Radius: 0.01
+
+  # Faces of bricks are never perfectly flat.
+  # Create a very low frequency noise to break up highlights
+  noise:
+    type: ShaderNodeTexNoise
+    location: -480, 0
+    inputs:
+      Scale: 0.01 # TODO: scene scale?
+      Detail: 1.0
+      Roughness: 1.0
+      Distortion: 0.0
+      Vector:
+        node: tex_coord
+        socket: Object
+
+  bump:
+    type: ShaderNodeBump
+    location: -240, 0
+    inputs:
+      Strength: 1.0
+      Distance: 0.01
+      Height:
+        node: noise
+        socket: Fac
+      Normal: bevel
+
+  tex_coord:
+    type: ShaderNodeTexCoord
+    location: -720, 0

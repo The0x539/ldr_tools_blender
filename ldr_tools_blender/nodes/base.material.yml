@@ -1,0 +1,71 @@
+bsdf:
+  type: ShaderNodeBsdfPrincipled
+  location: -240, 462
+  # RANDOM_WALK is more accurate but has discoloration around thin corners.
+  # TODO: This is in Blender units and should depend on scene scale
+  subsurface_method: BURLEY
+  inputs:
+    # Use a less accurate SSS method instead.
+    Subsurface Weight: 1.0
+    Subsurface Scale: 0.025
+    Roughness: roughness
+    Base Color: speckle
+    Normal: mix_normals
+
+output:
+  type: ShaderNodeOutputMaterial
+  location: 60, 462
+  inputs:
+    Surface: bsdf
+
+roughness:
+  type: ShaderNodeGroup
+  location: -430, 500
+  label: Roughness
+  node_tree: ldr_tools_roughness
+
+base_color:
+  type: ShaderNodeRGB
+  location: -620, 700
+  label: Base Color
+
+speckle:
+  type: ShaderNodeGroup
+  location: -430, 700
+  label: Speckle
+  node_tree: ldr_tools_speckle
+  mute: true
+  inputs:
+    # Adjust the thresholds to control speckle size and density.
+    Min: 0.5
+    Max: 0.6
+    Base Color: base_color
+
+normals:
+  type: ShaderNodeGroup
+  location: -620, 200
+  label: Normals
+  node_tree: ldr_tools_normal
+
+slope_normals:
+  type: ShaderNodeGroup
+  location: -620, 100
+  label: Slope Normals
+  node_tree: ldr_tools_slope_normal
+
+is_slope:
+  type: ShaderNodeGroup
+  location: -620, 300
+  label: Is Slope
+  node_tree: ldr_tools_is_slope
+
+mix_normals:
+  type: ShaderNodeMix
+  location: -430, 330
+  label: Mix Normals
+  data_type: VECTOR
+  mute: true
+  inputs:
+    Factor: is_slope
+    A: normals
+    B: slope_normals

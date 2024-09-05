@@ -1,0 +1,42 @@
+inputs:
+  Min: NodeSocketFloat
+  Max: NodeSocketFloat
+
+outputs:
+  Roughness: NodeSocketFloat
+
+nodes:
+  input:
+    type: NodeGroupInput
+    location: -480, -300
+
+  # TODO: Create frame called "smudges" or at least name the nodes.
+  noise:
+    type: ShaderNodeTexNoise
+    location: -480, 0
+    inputs:
+      Scale: 4.0
+      Detail: 2.0
+      Roughness: 0.5
+      Distortion: 0.0
+
+  # Easier to configure than a color ramp since the input is 1D.
+  map_range:
+    type: ShaderNodeMapRange
+    location: -240, 0
+    inputs:
+      Value:
+        node: noise
+        socket: Fac
+      To Min:
+        node: input
+        socket: Min
+      To Max:
+        node: input
+        socket: Max
+
+  output:
+    type: NodeGroupOutput
+    location: 0, 0
+    inputs:
+      - map_range
