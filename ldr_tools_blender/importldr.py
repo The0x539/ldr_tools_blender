@@ -2,6 +2,7 @@ import bpy
 import numpy as np
 import mathutils
 import math
+import os.path
 
 # TODO: Create a pyi type stub file?
 from . import ldr_tools_py
@@ -9,6 +10,8 @@ from . import ldr_tools_py
 from .ldr_tools_py import LDrawNode, LDrawGeometry, LDrawColor, GeometrySettings
 
 from .material import get_material
+
+from . import node_dsl
 
 # TODO: Add type hints for all functions.
 
@@ -153,51 +156,15 @@ def import_instanced(
 def create_geometry_node_instancing(
     instancer_object: bpy.types.Object, instance_object: bpy.types.Object
 ):
-    modifier = instancer_object.modifiers.new(name="GeometryNodes", type="NODES")
-    node_tree = bpy.data.node_groups.new("GeometryNodes", "GeometryNodeTree")
-    modifier.node_group = node_tree
-    nodes = node_tree.nodes
-    links = node_tree.links
-
-    group_input = nodes.new("NodeGroupInput")
-    node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketGeometry", name="Geometry"
-    )
-
-    group_output = nodes.new("NodeGroupOutput")
-    node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketGeometry", name="Geometry"
-    )
-
-    # The instancer mesh's points define the instance translation.
-    instance_points = nodes.new(type="GeometryNodeInstanceOnPoints")
-    links.new(group_input.outputs["Geometry"], instance_points.inputs["Points"])
-    links.new(instance_points.outputs["Instances"], group_output.inputs["Geometry"])
+    current_dir = os.path.dirname(__file__)
+    filepath = os.path.join(current_dir, "nodes", "instancing.geometry.yml")
+    node_tree = node_dsl.load_geometry_node_group(filepath, "GeometryNodes")
 
     # Set the instance mesh.
-    instance_info = nodes.new(type="GeometryNodeObjectInfo")
-    instance_info.inputs[0].default_value = instance_object
-    links.new(instance_info.outputs["Geometry"], instance_points.inputs["Instance"])
+    node_tree.nodes["instance_info"].inputs[0].default_value = instance_object
 
-    # Scale instances from the custom attribute.
-    scale_attribute = nodes.new(type="GeometryNodeInputNamedAttribute")
-    scale_attribute.data_type = "FLOAT_VECTOR"
-    scale_attribute.inputs["Name"].default_value = "instance_scale"
-    links.new(scale_attribute.outputs["Attribute"], instance_points.inputs["Scale"])
-
-    # Rotate instances from the custom attributes.
-    rot_axis = nodes.new(type="GeometryNodeInputNamedAttribute")
-    rot_axis.data_type = "FLOAT_VECTOR"
-    rot_axis.inputs["Name"].default_value = "instance_rotation_axis"
-
-    rot_angle = nodes.new(type="GeometryNodeInputNamedAttribute")
-    rot_angle.data_type = "FLOAT"
-    rot_angle.inputs["Name"].default_value = "instance_rotation_angle"
-
-    rotation = nodes.new(type="FunctionNodeAxisAngleToRotation")
-    links.new(rot_axis.outputs["Attribute"], rotation.inputs["Axis"])
-    links.new(rot_angle.outputs["Attribute"], rotation.inputs["Angle"])
-    links.new(rotation.outputs["Rotation"], instance_points.inputs["Rotation"])
+    modifier = instancer_object.modifiers.new(name="GeometryNodes", type="NODES")
+    modifier.node_group = node_tree
 
 
 def create_instancer_mesh(name: str, instances: ldr_tools_py.PointInstances):

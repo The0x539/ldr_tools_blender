@@ -1,0 +1,62 @@
+inputs:
+  Geometry: NodeSocketGeometry
+
+outputs:
+  Geometry: NodeSocketGeometry
+
+nodes:
+  group_input:
+    location: -380, 0
+    type: NodeGroupInput
+
+  group_output:
+    location: 0, 0
+    type: NodeGroupOutput
+    inputs:
+      Geometry: instance_points
+
+  # The instancer mesh's points define the instance translation.
+  instance_points:
+    location: -190, 0
+    type: GeometryNodeInstanceOnPoints
+    inputs:
+      Points: group_input
+      Instance:
+        node: instance_info
+        socket: Geometry
+      Scale: scale_attribute
+      Rotation: rotation
+
+  instance_info:
+    location: -380, -91
+    type: GeometryNodeObjectInfo
+
+  # Scale instances from the custom attribute.
+  scale_attribute:
+    location: -380, -434
+    type: GeometryNodeInputNamedAttribute
+    data_type: FLOAT_VECTOR
+    inputs:
+      Name: "instance_scale"
+
+  # Rotate instances from the custom attributes.
+  rot_axis:
+    location: -570, 0
+    type: GeometryNodeInputNamedAttribute
+    data_type: FLOAT_VECTOR
+    inputs:
+      Name: "instance_rotation_axis"
+
+  rot_angle:
+    location: -570, -318
+    type: GeometryNodeInputNamedAttribute
+    data_type: FLOAT
+    inputs:
+      Name: "instance_rotation_angle"
+
+  rotation:
+    location: -380, -318
+    type: FunctionNodeAxisAngleToRotation
+    inputs:
+      Axis: rot_axis
+      Angle: rot_angle

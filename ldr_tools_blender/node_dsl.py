@@ -122,6 +122,10 @@ def load_shader_node_group(filepath: str, name: str) -> bpy.types.ShaderNodeTree
     return load_node_group(filepath, name, bpy.types.ShaderNodeTree)
 
 
+def load_geometry_node_group(filepath: str, name: str) -> bpy.types.GeometryNodeTree:
+    return load_node_group(filepath, name, bpy.types.GeometryNodeTree)
+
+
 def _populate_node_tree(
     tree: bpy.types.NodeTree,
     definitions: dict[str, NodeDefinition],
