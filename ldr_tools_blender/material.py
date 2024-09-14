@@ -35,6 +35,9 @@ from bpy.types import (
     ShaderNodeVectorMath,
 )
 
+from .eyesight_nodes import node_group_solid, node_group_trans_group_base
+from .eyesight_colors import colors as eyesight_colors
+
 # Materials are based on the techniques described in the following blog posts.
 # This covers how to create lego shaders with realistic surface detailing.
 # https://stefanmuller.com/exploring-lego-material-part-1/
@@ -73,6 +76,27 @@ def get_material(
     r, g, b, a = 1.0, 1.0, 1.0, 1.0
     if ldraw_color is not None:
         r, g, b, a = ldraw_color.rgba_linear
+
+    if code in eyesight_colors:
+        r, g, b = eyesight_colors[code]
+        inputs = {
+            "BaseColor": (r, g, b, 1.0),
+            "SubsurfaceColor": (r, g, b, 1.0),
+        }
+        if a <= 0.6:
+            group = node_group_trans_group_base()
+            inputs["WhiteColor"] = (1.0, 1.0, 1.0, 1.0)
+        else:
+            group = node_group_solid()
+
+        node = graph.node(ShaderNodeGroup, node_tree=group, inputs=inputs)
+        output = graph.node(
+            ShaderNodeOutputMaterial, inputs={"Surface": node["Shader"]}
+        )
+        if a <= 0.6:
+            output["Volume"] = node["Volume"]
+
+        return material
 
     # Set the color in the viewport.
     # This can use the default LDraw color for familiarity.
