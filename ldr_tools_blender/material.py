@@ -77,16 +77,23 @@ def get_material(
     if ldraw_color is not None:
         r, g, b, a = ldraw_color.rgba_linear
 
+    # Set the color in the viewport.
+    # This can use the default LDraw color for familiarity.
+    material.diffuse_color = (r, g, b, a)
+
     if code in eyesight_colors:
         r, g, b = eyesight_colors[code]
-        inputs = {
-            "BaseColor": (r, g, b, 1.0),
-            "SubsurfaceColor": (r, g, b, 1.0),
-        }
         if a <= 0.6:
             group = node_group_trans_group_base()
-            inputs["WhiteColor"] = (1.0, 1.0, 1.0, 1.0)
+            inputs = {
+                "Color": (r, g, b, 1.0),
+                "WhiteColor": (1.0, 1.0, 1.0, 1.0),
+            }
         else:
+            inputs = {
+                "BaseColor": (r, g, b, 1.0),
+                # "SubsurfaceColor": (r, g, b, 1.0),
+            }
             group = node_group_solid()
 
         node = graph.node(ShaderNodeGroup, node_tree=group, inputs=inputs)
@@ -97,10 +104,6 @@ def get_material(
             output["Volume"] = node["Volume"]
 
         return material
-
-    # Set the color in the viewport.
-    # This can use the default LDraw color for familiarity.
-    material.diffuse_color = (r, g, b, a)
 
     # Partially complete alternatives to LDraw colors for better realism.
     if code in rgb_ldr_tools_by_code:

@@ -12,6 +12,7 @@ from bpy.types import (
     ShaderNodeObjectInfo,
     ShaderNodeTree,
     ShaderNodeMath,
+    ShaderNodeGroup,
     NodeTreeInterfaceSocketInt,
     ShaderNodeMapRange,
     ShaderNodeMix,
@@ -19,7 +20,36 @@ from bpy.types import (
     ShaderNodeSeparateXYZ,
     ShaderNodeCombineXYZ,
     ShaderNodeVectorTransform,
+    ShaderNodeVectorMath,
 )
+
+
+# Copied directly from material.py. Whatever.
+def node_group_object_scale() -> ShaderNodeTree:
+    if tree := bpy.data.node_groups.get("Object Scale"):
+        assert isinstance(tree, ShaderNodeTree)
+        return tree
+
+    tree = bpy.data.node_groups.new("Object Scale", "ShaderNodeTree")  # type: ignore
+    assert isinstance(tree, ShaderNodeTree)
+    graph = NodeGraph(tree)
+
+    graph.output(NodeSocketFloat, "Value")
+
+    transform = graph.node(
+        ShaderNodeVectorTransform,
+        vector_type="VECTOR",
+        convert_from="OBJECT",
+        convert_to="WORLD",
+        inputs=[(1.0, 0.0, 0.0)],
+    )
+
+    length = graph.node(
+        ShaderNodeVectorMath, operation="LENGTH", location=(200, 0), inputs=[transform]
+    )
+
+    graph.node(NodeGroupOutput, location=(400, 0), inputs=[length])
+    return graph.tree
 
 
 def node_group_uv_degradation() -> ShaderNodeTree:
@@ -188,8 +218,14 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
         inputs=[input],
     )
 
+    object_scale = graph.node(ShaderNodeGroup, node_tree=node_group_object_scale())
+
+    apply_scale = graph.node(
+        ShaderNodeVectorMath, operation="MULTIPLY", inputs=[transform, object_scale]
+    )
+
     split_pos = graph.node(
-        ShaderNodeSeparateXYZ, label="Split Position", inputs=[transform]
+        ShaderNodeSeparateXYZ, label="Split Position", inputs=[apply_scale]
     )
 
     # technically XYZ is redundant but the uniformity it easier to maintain and think about
