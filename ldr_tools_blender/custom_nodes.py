@@ -18,6 +18,7 @@ from bpy.types import (
     ShaderNodeTexCoord,
     ShaderNodeSeparateXYZ,
     ShaderNodeCombineXYZ,
+    ShaderNodeVectorTransform,
 )
 
 
@@ -179,10 +180,24 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
         ShaderNodeMath, operation="GREATER_THAN", label="Facing Y", inputs=[abs_y, 0.5]
     )
 
-    split_pos = graph.node(
-        ShaderNodeSeparateXYZ, label="Split Position", inputs=[input]
+    transform = graph.node(
+        ShaderNodeVectorTransform,
+        vector_type="VECTOR",
+        convert_from="WORLD",
+        convert_to="OBJECT",
+        inputs=[input],
     )
 
+    split_pos = graph.node(
+        ShaderNodeSeparateXYZ, label="Split Position", inputs=[transform]
+    )
+
+    # technically XYZ is redundant but the uniformity it easier to maintain and think about
+    xyz = graph.node(
+        ShaderNodeCombineXYZ,
+        label="XYZ",
+        inputs=[split_pos["X"], split_pos["Y"], split_pos["Z"]],
+    )
     xzy = graph.node(
         ShaderNodeCombineXYZ,
         label="XZY",
@@ -198,7 +213,7 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
         ShaderNodeMix,
         label="elseif facing X",
         data_type="VECTOR",
-        inputs={"Factor": facing_x, "B": yzx, "A": input},
+        inputs={"Factor": facing_x, "B": yzx, "A": xyz},
     )
 
     if_facing_y = graph.node(
