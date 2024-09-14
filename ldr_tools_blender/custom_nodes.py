@@ -40,7 +40,7 @@ def node_group_uv_degradation() -> ShaderNodeTree:
     graph.input(NodeSocketBool, "enable")
     graph.input(NodeSocketInt, "Levels")
 
-    graph.output(NodeSocketFloat, "OutColor")
+    graph.output(NodeSocketColor, "OutColor")
     graph.output(NodeSocketFloat, "OutRoughness")
 
     levels_socket: NodeTreeInterfaceSocketInt = tree.interface.items_tree[
