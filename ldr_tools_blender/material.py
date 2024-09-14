@@ -55,8 +55,8 @@ def get_material(
     name = str(code)
     if ldraw_color is not None:
         name = f"{code} {ldraw_color.name}"
-        if is_slope:
-            name += " slope"
+        # if is_slope:
+        #     name += " slope"
 
     material = bpy.data.materials.get(name)
     if material is not None:

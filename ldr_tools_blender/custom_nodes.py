@@ -21,7 +21,62 @@ from bpy.types import (
     ShaderNodeCombineXYZ,
     ShaderNodeVectorTransform,
     ShaderNodeVectorMath,
+    ShaderNodeAttribute,
 )
+
+
+# Copied directly from material.py. Whatever.
+def node_group_is_slope() -> ShaderNodeTree:
+    if tree := bpy.data.node_groups.get("Is Slope"):
+        assert isinstance(tree, ShaderNodeTree)
+        return tree
+
+    tree = bpy.data.node_groups.new("Is Slope", "ShaderNodeTree")  # type: ignore
+    assert isinstance(tree, ShaderNodeTree)
+    graph = NodeGraph(tree)
+
+    graph.output(NodeSocketFloat, "Factor")
+
+    # Apply grainy normals to faces that aren't vertical or horizontal.
+    # Use non transformed normals to not consider object rotation.
+    ldr_normals = graph.node(
+        ShaderNodeAttribute, location=(-1600, 400), attribute_name="ldr_normals"
+    )
+
+    separate = graph.node(
+        ShaderNodeSeparateXYZ, location=(-1400, 400), inputs=[ldr_normals["Vector"]]
+    )
+
+    # Use normal.y to check if the face is horizontal (-1.0 or 1.0) or vertical (0.0).
+    # Any values in between are considered "slopes" and use grainy normals.
+    absolute = graph.node(
+        ShaderNodeMath,
+        location=(-1200, 400),
+        operation="ABSOLUTE",
+        inputs=[separate["Y"]],
+    )
+    compare = graph.node(
+        ShaderNodeMath,
+        location=(-1000, 400),
+        operation="COMPARE",
+        inputs=[absolute, 0.5, 0.45],
+    )
+
+    is_stud = graph.node(
+        ShaderNodeAttribute, location=(-1000, 200), attribute_name="ldr_is_stud"
+    )
+
+    # Don't apply the grainy slopes to any faces marked as studs.
+    # We use an attribute here to avoid per face material assignment.
+    subtract_studs = graph.node(
+        ShaderNodeMath,
+        location=(-800, 400),
+        operation="SUBTRACT",
+        inputs=[compare, is_stud["Fac"]],
+    )
+
+    graph.node(NodeGroupOutput, location=(-600, 400), inputs=[subtract_studs])
+    return tree
 
 
 # Copied directly from material.py. Whatever.
