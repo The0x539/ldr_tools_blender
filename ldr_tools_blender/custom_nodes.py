@@ -189,6 +189,7 @@ def node_group_uv_degradation() -> ShaderNodeTree:
 
     out_color = graph.node(
         ShaderNodeMix,
+        data_type="RGBA",
         label="OutColor",
         inputs={0: color_t, "A": input3["FromColor"], "B": input3["ToColor"]},
     )
