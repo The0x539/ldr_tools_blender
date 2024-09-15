@@ -17,6 +17,8 @@ from bpy.types import (
     ShaderNodeMath,
     ShaderNodeSeparateXYZ,
     ShaderNodeCombineXYZ,
+    ShaderNodeSeparateRGB,
+    ShaderNodeCombineRGB,
     ShaderNodeValToRGB,
     ShaderNodeBump,
 )
@@ -183,3 +185,74 @@ def convert_to_normals(graph: NodeGraph[ShaderNodeTree]) -> None:
     )
 
     graph.node(NodeGroupOutput, inputs=[bump])
+
+
+@group("LEGO Transparent")
+def lego_transparent(graph: NodeGraph[ShaderNodeTree]) -> None:
+    graph.input(ShaderNodeColor, "Color")
+    for socket in (
+        "Subsurface",
+        "Specular",
+        "Roughness",
+        "IOR",
+        "Transmission",
+        "Transmission Roughness",
+    ):
+        graph.input(NodeSocketFloat, socket)
+
+    graph.input(NodeSocketVector, "Normal")
+    graph.output(NodeSocketShader, "Shader")
+
+    input = graph.node(NodeGroupInput)
+
+    # force dark colors to be brighter so they're visibly transparent
+    separate_color = graph.node(
+        ShaderNodeSeparateRGB, mode="HSV", inputs=[input["Color"]]
+    )
+    clamped_value = graph.node(
+        ShaderNodeMath,
+        operation="MAXIMUM",
+        use_clamp=True,
+        inputs=[separate_color["Value"], 0.4],
+    )
+    combine_color = graph.node(
+        ShaderNodeCombineRGB,
+        mode="HSV",
+        inputs=[separate_color["Hue"], separate_color["Saturation"], clamped_value],
+    )
+
+    mix = graph.node(
+        ShaderNodeMix,
+        data_type="RGBA",
+        clamp_result=False,
+        clamp_factor=True,
+        inputs={
+            "Factor": input["Subsurface"],
+            "A": combine_color,
+            "B": (1.0, 1.0, 1.0, 1.0),
+        },
+    )
+
+    concave_walls = graph.node(
+        ShaderNodeGroup,
+        node_tree=concave_walls(),
+        inputs={"Strength": 0.08, "Normal": input["Normal"]},
+    )
+
+    bsdf = graph.node(
+        ShaderNodeBsdfPrincipled,
+        subsurface_method="BURLEY",
+        inputs={
+            "Base Color": mix,
+            "Roughness": input["Roughness"],
+            "IOR": input["IOR"],
+            "Normal": concave_walls,
+            "Subsurface Weight": 1.0,
+            "Subsurface Radius": (1.0, 0.2, 0.1),
+            "Subsurface Scale": input["Subsurface"],
+            "IOR Level": input["Specular"],
+            "Transmission Weight": input["Transmission"],
+        },
+    )
+
+    graph.node(NodeGroupOutput, inputs=[bsdf])
