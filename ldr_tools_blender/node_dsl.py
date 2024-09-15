@@ -6,6 +6,7 @@ from typing import (
     TypeAlias,
     Iterable,
     overload,
+    Any,
 )
 
 import bpy.types
@@ -25,9 +26,26 @@ class NodeGraph(Generic[T]):
     def __init__(self, tree: T) -> None:
         self.tree = tree
 
-    def input(self, socket_type: type[S], name: str) -> None:
+    def input(
+        self,
+        socket_type: type[S],
+        name: str,
+        /,
+        default: X | None = None,
+        min_max: tuple[X, X] | None = None,
+    ) -> None:
         stype = socket_type.__name__
-        self.tree.interface.new_socket(name, in_out="INPUT", socket_type=stype)
+        socket = self.tree.interface.new_socket(name, in_out="INPUT", socket_type=stype)
+
+        if default is not None:
+            assert hasattr(socket, "default_value")
+            socket.default_value = default
+
+        if min_max is not None:
+            assert hasattr(socket, "min_value")
+            assert hasattr(socket, "max_value")
+            socket.min_value = min_max[0]
+            socket.max_value = min_max[1]
 
     def output(self, socket_type: type[S], name: str) -> None:
         stype = socket_type.__name__

@@ -33,9 +33,11 @@ from bpy.types import (
     ShaderNodeGroup,
     ShaderNodeVectorTransform,
     ShaderNodeVectorMath,
+    ShaderNodeValue,
 )
 
-from .eyesight_nodes import node_group_solid, node_group_trans_group_base
+# from .eyesight_nodes import node_group_solid, node_group_trans_group_base
+from .cuddlyogre import lego_standard, lego_transparent
 from .eyesight_colors import colors as eyesight_colors
 
 # Materials are based on the techniques described in the following blog posts.
@@ -84,24 +86,20 @@ def get_material(
     if code in eyesight_colors:
         r, g, b = eyesight_colors[code]
         if a <= 0.6:
-            group = node_group_trans_group_base()
-            inputs = {
-                "Color": (r, g, b, 1.0),
-                "WhiteColor": (1.0, 1.0, 1.0, 1.0),
-            }
+            group = lego_transparent()
         else:
-            inputs = {
-                "BaseColor": (r, g, b, 1.0),
-                # "SubsurfaceColor": (r, g, b, 1.0),
-            }
-            group = node_group_solid()
+            group = lego_standard()
 
-        node = graph.node(ShaderNodeGroup, node_tree=group, inputs=inputs)
+        node = graph.node(
+            ShaderNodeGroup, node_tree=group, inputs={"Color": (r, g, b, 1.0)}
+        )
         output = graph.node(
             ShaderNodeOutputMaterial, inputs={"Surface": node["Shader"]}
         )
         if a <= 0.6:
-            output["Volume"] = node["Volume"]
+            thickness = graph.node(ShaderNodeValue)
+            thickness.node.outputs[0].default_value = 0.5
+            output["Thickness"] = thickness
 
         return material
 

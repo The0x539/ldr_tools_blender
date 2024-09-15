@@ -39,6 +39,7 @@ def group(
 
         tree = bpy.data.node_groups.new(name, "ShaderNodeTree")  # type: ignore[arg-type]
         assert isinstance(tree, ty)
+        f(NodeGraph(tree))
         return tree
 
     return lambda f: lambda: build_node(f)
