@@ -1,5 +1,5 @@
 import bpy
-from .node_dsl import NodeGraph
+from .node_dsl import ShaderGraph
 
 from bpy.types import (
     NodeSocketInt,
@@ -26,69 +26,38 @@ from bpy.types import (
 
 
 # Copied directly from material.py. Whatever.
-def node_group_is_slope() -> ShaderNodeTree:
-    if tree := bpy.data.node_groups.get("Is Slope"):
-        assert isinstance(tree, ShaderNodeTree)
-        return tree
-
-    tree = bpy.data.node_groups.new("Is Slope", "ShaderNodeTree")  # type: ignore
-    assert isinstance(tree, ShaderNodeTree)
-    graph = NodeGraph(tree)
-
+def is_slope_node_group(graph: ShaderGraph) -> None:
     graph.output(NodeSocketFloat, "Factor")
 
     # Apply grainy normals to faces that aren't vertical or horizontal.
     # Use non transformed normals to not consider object rotation.
-    ldr_normals = graph.node(
-        ShaderNodeAttribute, location=(-1600, 400), attribute_name="ldr_normals"
-    )
+    ldr_normals = graph.node(ShaderNodeAttribute, attribute_name="ldr_normals")
+    ldr_normals.node.location = (-1600, 400)
 
-    separate = graph.node(
-        ShaderNodeSeparateXYZ, location=(-1400, 400), inputs=[ldr_normals["Vector"]]
-    )
+    separate = graph.node(ShaderNodeSeparateXYZ, [ldr_normals["Vector"]])
+    separate.node.location = (-1400, 400)
 
     # Use normal.y to check if the face is horizontal (-1.0 or 1.0) or vertical (0.0).
     # Any values in between are considered "slopes" and use grainy normals.
-    absolute = graph.node(
-        ShaderNodeMath,
-        location=(-1200, 400),
-        operation="ABSOLUTE",
-        inputs=[separate["Y"]],
-    )
-    compare = graph.node(
-        ShaderNodeMath,
-        location=(-1000, 400),
-        operation="COMPARE",
-        inputs=[absolute, 0.5, 0.45],
-    )
+    absolute = graph.math_node("ABSOLUTE", [separate["Y"]])
+    absolute.node.location = (-1200, 400)
+    compare = graph.math_node("COMPARE", [absolute, 0.5, 0.45])
+    compare.node.location = (-1000, 400)
 
-    is_stud = graph.node(
-        ShaderNodeAttribute, location=(-1000, 200), attribute_name="ldr_is_stud"
-    )
+    is_stud = graph.node(ShaderNodeAttribute, attribute_name="ldr_is_stud")
+    is_stud.node.location = (-1000, 200)
 
     # Don't apply the grainy slopes to any faces marked as studs.
     # We use an attribute here to avoid per face material assignment.
-    subtract_studs = graph.node(
-        ShaderNodeMath,
-        location=(-800, 400),
-        operation="SUBTRACT",
-        inputs=[compare, is_stud["Fac"]],
-    )
+    subtract_studs = graph.math_node("SUBTRACT", [compare, is_stud["Fac"]])
+    subtract_studs.node.location = (-800, 400)
 
-    graph.node(NodeGroupOutput, location=(-600, 400), inputs=[subtract_studs])
-    return tree
+    output = graph.node(NodeGroupOutput, [subtract_studs])
+    output.node.location = (-600, 400)
 
 
 # Copied directly from material.py. Whatever.
-def node_group_object_scale() -> ShaderNodeTree:
-    if tree := bpy.data.node_groups.get("Object Scale"):
-        assert isinstance(tree, ShaderNodeTree)
-        return tree
-
-    tree = bpy.data.node_groups.new("Object Scale", "ShaderNodeTree")  # type: ignore
-    assert isinstance(tree, ShaderNodeTree)
-    graph = NodeGraph(tree)
-
+def object_scale_node_group(graph: ShaderGraph) -> None:
     graph.output(NodeSocketFloat, "Value")
 
     transform = graph.node(
@@ -99,23 +68,14 @@ def node_group_object_scale() -> ShaderNodeTree:
         inputs=[(1.0, 0.0, 0.0)],
     )
 
-    length = graph.node(
-        ShaderNodeVectorMath, operation="LENGTH", location=(200, 0), inputs=[transform]
-    )
+    length = graph.node(ShaderNodeVectorMath, operation="LENGTH", inputs=[transform])
+    length.node.location = (200, 0)
 
-    graph.node(NodeGroupOutput, location=(400, 0), inputs=[length])
-    return graph.tree
+    output = graph.node(NodeGroupOutput, [length])
+    output.node.location = (400, 0)
 
 
-def node_group_uv_degradation() -> ShaderNodeTree:
-    if tree := bpy.data.node_groups.get("UV Degradation"):
-        assert isinstance(tree, ShaderNodeTree)
-        return tree
-
-    tree = bpy.data.node_groups.new("UV Degradation", "ShaderNodeTree")  # type: ignore
-    assert isinstance(tree, ShaderNodeTree)
-    graph = NodeGraph(tree)
-
+def uv_degradation_node_group(graph: ShaderGraph) -> None:
     graph.input(NodeSocketColor, "FromColor")
     graph.input(NodeSocketColor, "ToColor")
     graph.input(NodeSocketFloat, "MinColorRatio")
@@ -129,7 +89,7 @@ def node_group_uv_degradation() -> ShaderNodeTree:
     graph.output(NodeSocketColor, "OutColor")
     graph.output(NodeSocketFloat, "OutRoughness")
 
-    levels_socket: NodeTreeInterfaceSocketInt = tree.interface.items_tree[
+    levels_socket: NodeTreeInterfaceSocketInt = graph.tree.interface.items_tree[
         "Levels"
     ]  # type:ignore
     levels_socket.min_value = 1
@@ -139,21 +99,14 @@ def node_group_uv_degradation() -> ShaderNodeTree:
     input = graph.node(NodeGroupInput)
     object_info = graph.node(ShaderNodeObjectInfo)
 
-    step_1 = graph.node(
-        ShaderNodeMath,
-        operation="MULTIPLY",
-        inputs=[object_info["Random"], input["Levels"]],
-    )
+    step_1 = graph.math_node("MULTIPLY", [object_info["Random"], input["Levels"]])
 
-    step_2 = graph.node(ShaderNodeMath, operation="FLOOR", inputs=[step_1])
+    step_2 = graph.math_node("FLOOR", [step_1])
 
-    step_3 = graph.node(
-        ShaderNodeMath, operation="SUBTRACT", inputs=[input["Levels"], 1.0]
-    )
+    step_3 = graph.math_node("SUBTRACT", [input["Levels"], 1.0])
 
-    t = graph.node(
-        ShaderNodeMath,
-        operation="DIVIDE",
+    t = graph.math_node(
+        "DIVIDE",
         use_clamp=True,
         inputs=[step_2, step_3],
         label="t",
@@ -163,26 +116,20 @@ def node_group_uv_degradation() -> ShaderNodeTree:
 
     color_ratio = graph.node(
         ShaderNodeMapRange,
-        label="ColorRatio",
-        inputs={
+        {
             "Value": t,
             "To Min": input2["MinColorRatio"],
             "To Max": input2["MaxColorRatio"],
         },
+        label="ColorRatio",
     )
 
-    color_t = graph.node(
-        ShaderNodeMath,
-        operation="MULTIPLY",
-        label="color_t",
-        inputs=[color_ratio, input2["Strength"]],
+    color_t = graph.math_node(
+        "MULTIPLY", [color_ratio, input2["Strength"]], label="color_t"
     )
 
-    t_strength = graph.node(
-        ShaderNodeMath,
-        operation="MULTIPLY",
-        label="t * Strength",
-        inputs=[t, input2["Strength"]],
+    t_strength = graph.math_node(
+        "MULTIPLY", [t, input2["Strength"]], label="t * Strength"
     )
 
     input3 = graph.node(NodeGroupInput, label="Group Input (Ranges)")
@@ -223,24 +170,11 @@ def node_group_uv_degradation() -> ShaderNodeTree:
 
     graph.node(
         NodeGroupOutput,
-        inputs={
-            "OutColor": toggle_out_color,
-            "OutRoughness": toggle_out_roughness,
-        },
+        {"OutColor": toggle_out_color, "OutRoughness": toggle_out_roughness},
     )
 
-    return tree
 
-
-def node_group_project_to_axis_plane() -> ShaderNodeTree:
-    if tree := bpy.data.node_groups.get("Project To Axis Plane"):
-        assert isinstance(tree, ShaderNodeTree)
-        return tree
-
-    tree = bpy.data.node_groups.new("Project To Axis Plane", "ShaderNodeTree")  # type: ignore
-    assert isinstance(tree, ShaderNodeTree)
-    graph = NodeGraph(tree)
-
+def project_to_axis_plane_node_group(graph: ShaderGraph) -> None:
     graph.input(NodeSocketVector, "In")
     graph.output(NodeSocketVector, "Out")
 
@@ -249,22 +183,14 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
     tex_coord = graph.node(ShaderNodeTexCoord)
 
     split_normal = graph.node(
-        ShaderNodeSeparateXYZ, label="Split Normal", inputs=[tex_coord["Normal"]]
+        ShaderNodeSeparateXYZ, [tex_coord["Normal"]], label="Split Normal"
     )
 
-    abs_x = graph.node(
-        ShaderNodeMath, operation="ABSOLUTE", label="Abs(X)", inputs=[split_normal["X"]]
-    )
-    abs_y = graph.node(
-        ShaderNodeMath, operation="ABSOLUTE", label="Abs(Y)", inputs=[split_normal["Y"]]
-    )
+    abs_x = graph.math_node("ABSOLUTE", [split_normal["X"]], label="Abs(X)")
+    abs_y = graph.math_node("ABSOLUTE", [split_normal["Y"]], label="Abs(Y)")
 
-    facing_x = graph.node(
-        ShaderNodeMath, operation="GREATER_THAN", label="Facing X", inputs=[abs_x, 0.5]
-    )
-    facing_y = graph.node(
-        ShaderNodeMath, operation="GREATER_THAN", label="Facing Y", inputs=[abs_y, 0.5]
-    )
+    facing_x = graph.math_node("GREATER_THAN", [abs_x, 0.5], label="Facing X")
+    facing_y = graph.math_node("GREATER_THAN", [abs_y, 0.5], label="Facing Y")
 
     transform = graph.node(
         ShaderNodeVectorTransform,
@@ -274,32 +200,29 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
         inputs=[input],
     )
 
-    object_scale = graph.node(ShaderNodeGroup, node_tree=node_group_object_scale())
+    object_scale = graph.group_node(object_scale_node_group)
 
     apply_scale = graph.node(
         ShaderNodeVectorMath, operation="MULTIPLY", inputs=[transform, object_scale]
     )
 
-    split_pos = graph.node(
-        ShaderNodeSeparateXYZ, label="Split Position", inputs=[apply_scale]
-    )
+    split_pos = graph.node(ShaderNodeSeparateXYZ, [apply_scale], label="Split Position")
 
     # technically XYZ is redundant but the uniformity it easier to maintain and think about
     xyz = graph.node(
-        ShaderNodeCombineXYZ,
-        label="XYZ",
-        inputs=[split_pos["X"], split_pos["Y"], split_pos["Z"]],
+        ShaderNodeCombineXYZ, [split_pos["X"], split_pos["Y"], split_pos["Z"]]
     )
+    xyz.node.label = "XYZ"
+
     xzy = graph.node(
-        ShaderNodeCombineXYZ,
-        label="XZY",
-        inputs=[split_pos["X"], split_pos["Z"], split_pos["Y"]],
+        ShaderNodeCombineXYZ, [split_pos["X"], split_pos["Z"], split_pos["Y"]]
     )
+    xzy.node.label = "XZY"
+
     yzx = graph.node(
-        ShaderNodeCombineXYZ,
-        label="YZX",
-        inputs=[split_pos["Y"], split_pos["Z"], split_pos["X"]],
+        ShaderNodeCombineXYZ, [split_pos["Y"], split_pos["Z"], split_pos["X"]]
     )
+    yzx.node.label = "YZX"
 
     elif_facing_x = graph.node(
         ShaderNodeMix,
@@ -315,6 +238,4 @@ def node_group_project_to_axis_plane() -> ShaderNodeTree:
         inputs={"Factor": facing_y, "B": xzy, "A": elif_facing_x},
     )
 
-    graph.node(NodeGroupOutput, inputs=[if_facing_y])
-
-    return tree
+    graph.node(NodeGroupOutput, [if_facing_y])

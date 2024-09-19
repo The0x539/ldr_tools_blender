@@ -37,8 +37,9 @@ from bpy.types import (
     ShaderNodeValue,
 )
 
-# from .eyesight_nodes import node_group_solid, node_group_trans_group_base
-from .cuddlyogre import lego_standard, lego_transparent
+from .eyesight_nodes import solid_node_group, trans_group_base_node_group
+
+# from .cuddlyogre import lego_standard, lego_transparent
 from .eyesight_colors import colors as eyesight_colors
 
 # Materials are based on the techniques described in the following blog posts.
@@ -93,9 +94,9 @@ def get_material(
     if code in eyesight_colors:
         r, g, b = eyesight_colors[code]
         if a <= 0.6:
-            init = lego_transparent
+            init = trans_group_base_node_group
         else:
-            init = lego_standard
+            init = solid_node_group
 
         node = graph.group_node(init, {"Color": (r, g, b, 1.0)})
         output = graph.node(ShaderNodeOutputMaterial, {"Surface": node["Shader"]})
