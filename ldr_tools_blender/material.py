@@ -95,15 +95,18 @@ def get_material(
         r, g, b = eyesight_colors[code]
         if a <= 0.6:
             init = trans_group_base_node_group
+            inputs = {"Color": (r, g, b, 1.0), "WhiteColor": (1.0, 1.0, 1.0, 1.0)}
         else:
             init = solid_node_group
+            inputs = {"BaseColor": (r, g, b, 1.0)}
 
-        node = graph.group_node(init, {"Color": (r, g, b, 1.0)})
+        node = graph.group_node(init, inputs)
         output = graph.node(ShaderNodeOutputMaterial, {"Surface": node["Shader"]})
         if a <= 0.6:
-            thickness = graph.node(ShaderNodeValue)
-            thickness.node.outputs[0].default_value = 0.5
-            output["Thickness"] = thickness
+            output["Volume"] = node["Volume"]
+            # thickness = graph.node(ShaderNodeValue)
+            # thickness.node.outputs[0].default_value = 0.5
+            # output["Thickness"] = thickness
 
         return material
 
