@@ -93,16 +93,12 @@ def get_material(
     if code in eyesight_colors:
         r, g, b = eyesight_colors[code]
         if a <= 0.6:
-            group = lego_transparent()
+            init = lego_transparent
         else:
-            group = lego_standard()
+            init = lego_standard
 
-        node = graph.node(
-            ShaderNodeGroup, node_tree=group, inputs={"Color": (r, g, b, 1.0)}
-        )
-        output = graph.node(
-            ShaderNodeOutputMaterial, inputs={"Surface": node["Shader"]}
-        )
+        node = graph.group_node(init, {"Color": (r, g, b, 1.0)})
+        output = graph.node(ShaderNodeOutputMaterial, {"Surface": node["Shader"]})
         if a <= 0.6:
             thickness = graph.node(ShaderNodeValue)
             thickness.node.outputs[0].default_value = 0.5

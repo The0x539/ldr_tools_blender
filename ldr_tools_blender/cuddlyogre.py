@@ -1,5 +1,4 @@
-from .node_dsl import NodeGraph
-from .material_util import group
+from .node_dsl import ShaderGraph
 
 from bpy.types import (
     ShaderNodeTree,
@@ -24,8 +23,7 @@ from bpy.types import (
 )
 
 
-@group("LEGO Standard")
-def lego_standard(graph: NodeGraph[ShaderNodeTree]) -> None:
+def lego_standard(graph: ShaderGraph) -> None:
     graph.input(NodeSocketColor, "Color")
     graph.input(NodeSocketFloat, "Roughness", default=0.1, min_max=(0.0, 1.0))
     graph.input(NodeSocketFloat, "Specular", default=0.5, min_max=(0.0, float("inf")))
@@ -34,15 +32,11 @@ def lego_standard(graph: NodeGraph[ShaderNodeTree]) -> None:
 
     input = graph.node(NodeGroupInput)
 
-    normals = graph.node(
-        ShaderNodeGroup,
-        node_tree=concave_walls(),
-        inputs={"Normal": input["Normal"]},
-    )
+    normals = graph.group_node(concave_walls, {"Normal": input["Normal"]})
 
     bsdf = graph.node(
         ShaderNodeBsdfPrincipled,
-        inputs={
+        {
             "Base Color": input["Color"],
             "Roughness": input["Roughness"],
             "IOR": 1.45,
@@ -51,29 +45,23 @@ def lego_standard(graph: NodeGraph[ShaderNodeTree]) -> None:
         },
     )
 
-    graph.node(NodeGroupOutput, inputs=[bsdf])
+    graph.node(NodeGroupOutput, [bsdf])
 
 
-@group("Concave Walls")
-def concave_walls(graph: NodeGraph[ShaderNodeTree]) -> None:
+def concave_walls(graph: ShaderGraph) -> None:
     graph.input(NodeSocketFloat, "Strength", default=0.08)
     graph.input(NodeSocketVector, "Normal")
     graph.output(NodeSocketVector, "Normal")
 
-    d2c = graph.node(ShaderNodeGroup, node_tree=distance_to_center())
+    d2c = graph.group_node(distance_to_center)
 
-    element_power = graph.node(
-        ShaderNodeGroup,
-        node_tree=vector_element_power(),
-        inputs=[4.0, d2c],
-    )
+    element_power = graph.group_node(vector_element_power, [4.0, d2c])
 
     input = graph.node(NodeGroupInput)
 
-    normals = graph.node(
-        ShaderNodeGroup,
-        node_tree=convert_to_normals(),
-        inputs={
+    normals = graph.group_node(
+        convert_to_normals,
+        {
             "Vector Length": element_power,
             "Smoothing": 0.3,
             "Strength": input["Strength"],
@@ -81,11 +69,10 @@ def concave_walls(graph: NodeGraph[ShaderNodeTree]) -> None:
         },
     )
 
-    graph.node(NodeGroupOutput, inputs=[normals])
+    graph.node(NodeGroupOutput, [normals])
 
 
-@group("Distance to Center")
-def distance_to_center(graph: NodeGraph[ShaderNodeTree]) -> None:
+def distance_to_center(graph: ShaderGraph) -> None:
     graph.output(NodeSocketVector, "Vector")
 
     tex_coord = graph.node(ShaderNodeTexCoord)
@@ -118,38 +105,32 @@ def distance_to_center(graph: NodeGraph[ShaderNodeTree]) -> None:
     graph.node(NodeGroupOutput, inputs=[multiply])
 
 
-@group("Vector Element Power")
-def vector_element_power(graph: NodeGraph[ShaderNodeTree]) -> None:
+def vector_element_power(graph: ShaderGraph) -> None:
     graph.input(NodeSocketFloat, "Exponent")
     graph.input(NodeSocketVector, "Vector")
     graph.output(NodeSocketVector, "Vector")
 
     input = graph.node(NodeGroupInput)
 
-    separate = graph.node(ShaderNodeSeparateXYZ, inputs=[input["Vector"]])
+    separate = graph.node(ShaderNodeSeparateXYZ, [input["Vector"]])
 
     elements = {}
     for w in ("X", "Y", "Z"):
-        absolute = graph.node(
-            ShaderNodeMath, operation="ABSOLUTE", inputs=[separate[w]]
-        )
+        absolute = graph.math_node("ABSOLUTE", [separate[w]])
 
-        power = graph.node(
-            ShaderNodeMath, operation="POWER", inputs=[absolute, input["Exponent"]]
-        )
+        power = graph.math_node("POWER", [absolute, input["Exponent"]])
 
         elements[w] = power
 
     combine = graph.node(
         ShaderNodeCombineXYZ,
-        inputs={"X": elements["X"], "Y": elements["Y"], "Z": elements["Z"]},
+        {"X": elements["X"], "Y": elements["Y"], "Z": elements["Z"]},
     )
 
-    graph.node(NodeGroupOutput, inputs=[combine])
+    graph.node(NodeGroupOutput, [combine])
 
 
-@group("Convert to Normals")
-def convert_to_normals(graph: NodeGraph[ShaderNodeTree]) -> None:
+def convert_to_normals(graph: ShaderGraph) -> None:
     graph.input(NodeSocketFloat, "Vector Length")
     graph.input(NodeSocketFloat, "Smoothing")
     graph.input(NodeSocketFloat, "Strength")
@@ -158,13 +139,9 @@ def convert_to_normals(graph: NodeGraph[ShaderNodeTree]) -> None:
 
     input = graph.node(NodeGroupInput)
 
-    power = graph.node(
-        ShaderNodeMath,
-        operation="POWER",
-        inputs=[input["Vector Length"], input["Smoothing"]],
-    )
+    power = graph.math_node("POWER", [input["Vector Length"], input["Smoothing"]])
 
-    ramp = graph.node(ShaderNodeValToRGB, inputs=[power])
+    ramp = graph.node(ShaderNodeValToRGB, [power])
     ramp.node.color_ramp.interpolation = "EASE"
     ramp.node.color_ramp.elements[0].color = (1.0, 1.0, 1.0, 1.0)
     ramp.node.color_ramp.elements[1].color = (0.0, 0.0, 0.0, 1.0)
@@ -172,7 +149,7 @@ def convert_to_normals(graph: NodeGraph[ShaderNodeTree]) -> None:
 
     bump = graph.node(
         ShaderNodeBump,
-        inputs={
+        {
             "Strength": input["Strength"],
             "Distance": 0.02,
             "Height": ramp["Color"],
@@ -180,11 +157,10 @@ def convert_to_normals(graph: NodeGraph[ShaderNodeTree]) -> None:
         },
     )
 
-    graph.node(NodeGroupOutput, inputs=[bump])
+    graph.node(NodeGroupOutput, [bump])
 
 
-@group("LEGO Transparent")
-def lego_transparent(graph: NodeGraph[ShaderNodeTree]) -> None:
+def lego_transparent(graph: ShaderGraph) -> None:
     graph.input(NodeSocketColor, "Color", default=(1.0, 1.0, 1.0, 1.0))
     graph.input(NodeSocketFloat, "Subsurface")
     graph.input(NodeSocketFloat, "Specular", default=0.5)
@@ -201,11 +177,8 @@ def lego_transparent(graph: NodeGraph[ShaderNodeTree]) -> None:
     separate_color = graph.node(
         ShaderNodeSeparateColor, mode="HSV", inputs=[input["Color"]]
     )
-    clamped_value = graph.node(
-        ShaderNodeMath,
-        operation="MAXIMUM",
-        use_clamp=True,
-        inputs=[separate_color[2], 0.4],
+    clamped_value = graph.math_node(
+        "MAXIMUM", use_clamp=True, inputs=[separate_color[2], 0.4]
     )
     combine_color = graph.node(
         ShaderNodeCombineColor,
@@ -225,11 +198,7 @@ def lego_transparent(graph: NodeGraph[ShaderNodeTree]) -> None:
         },
     )
 
-    normals = graph.node(
-        ShaderNodeGroup,
-        node_tree=concave_walls(),
-        inputs={"Normal": input["Normal"]},
-    )
+    normals = graph.group_node(concave_walls, {"Normal": input["Normal"]})
 
     bsdf = graph.node(
         ShaderNodeBsdfPrincipled,
@@ -247,4 +216,4 @@ def lego_transparent(graph: NodeGraph[ShaderNodeTree]) -> None:
         },
     )
 
-    graph.node(NodeGroupOutput, inputs=[bsdf])
+    graph.node(NodeGroupOutput, [bsdf])

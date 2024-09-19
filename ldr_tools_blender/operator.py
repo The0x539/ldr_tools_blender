@@ -99,7 +99,7 @@ class Preferences:
             json.dump(self, file, default=lambda o: o.__dict__)
 
     @staticmethod
-    def load() -> Self:
+    def load() -> Preferences:
         preferences = Preferences()
         try:
             with open(Preferences.preferences_path, "r") as file:
